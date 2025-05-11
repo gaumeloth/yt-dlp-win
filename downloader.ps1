@@ -1,16 +1,16 @@
 <#
 .SYNOPSIS
-  Check-Winget.ps1 – Installa/aggiorna yt-dlp con elevazione e poi effettua il download (video o audio) senza elevazione.
+  downloader.ps1 – Installa/aggiorna yt-dlp in modalità elevata, poi effettua il download (video o audio) senza privilegi elevati.
 
 .DESCRIPTION
-  - Senza parametri:
-    1) Rilancia in elevazione se necessario.
-    2) Installa o aggiorna yt-dlp tramite winget.
-    3) Rilancia se stesso in modalità "download" **senza** elevazione.
+  - Senza parametro -Download:
+      1) Rilancia in elevazione se non sei Admin.
+      2) Installa o aggiorna yt-dlp tramite winget.
+      3) Rilancia se stesso con -Download **in modalità normale**.
   - Con parametro -Download:
-    1) Chiede URL e tipo di download (video o audio).
-    2) Esegue yt-dlp **come utente normale**.
-    3) Pausa finale.
+      1) Chiede URL del video e tipo di download.
+      2) Esegue yt-dlp come utente standard.
+      3) Pausa finale.
 #>
 
 param(
@@ -36,51 +36,52 @@ if (-not $Download) {
         $psExe = Join-Path $env:WINDIR "System32\WindowsPowerShell\v1.0\powershell.exe"
         Write-Host "Rilancio in elevazione..." -ForegroundColor Yellow
         Start-Process -FilePath $psExe `
-                      -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`"" `
-                      -Verb RunAs
+            -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`"" `
+            -Verb RunAs
         exit
     }
+
     Write-Host "Sessione elevata confermata." -ForegroundColor Green
 
     # 2) Installa o aggiorna yt-dlp
-    Write-Host "Installo/aggiorno yt-dlp tramite winget..."
+    Write-Host "Installo/aggiorno yt-dlp tramite winget..." -NoNewline
     winget install --id yt-dlp.yt-dlp -e --accept-source-agreements --accept-package-agreements `
         -ErrorAction SilentlyContinue | Out-Null
     winget upgrade --id yt-dlp.yt-dlp -e --accept-source-agreements --accept-package-agreements `
         -ErrorAction SilentlyContinue | Out-Null
-    Write-Host "✔ yt-dlp è installato e aggiornato." -ForegroundColor Green
+    Write-Host " OK" -ForegroundColor Green
 
-    # 3) Rilancio in modalità download **senza** elevazione
-    Write-Host "`n=== Fase 2: Launch download (utente normale) ===" -ForegroundColor Cyan
+    # 3) Rilancio in modalità download (utente normale)
+    Write-Host "`n=== Fase 2: Avvio modalità download (utente normale) ===" -ForegroundColor Cyan
     $shell = New-Object -ComObject "Shell.Application"
     $args  = "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`" -Download"
     $shell.ShellExecute("powershell.exe", $args, "", "open", 1)
     exit
 }
 
-# ----------------------------------------------------
-# SE ARRIVIAMO QUI: siamo in modalità -Download, con UTENTE NORMALE
-# ----------------------------------------------------
-Write-Host "=== Download con yt-dlp (normale) ===" -ForegroundColor Cyan
+# ———————— qui siamo in modalità -Download ————————
+Write-Host "=== Download con yt-dlp (utente normale) ===" -ForegroundColor Cyan
 
-# Input URL
+# 4) Chiedo URL
 $videoUrl = Read-Host -Prompt "Inserisci il link del video"
 
-# Scelta download
+# 5) Chiedo tipo di download
 Write-Host "Scegli opzione di download:"
 Write-Host "  1) Video completo"
 Write-Host "  2) Solo audio"
 $choice = Read-Host -Prompt "Digita 1 o 2"
 
-# Esegui yt-dlp come utente non elevato
+# 6) Eseguo yt-dlp
 switch ($choice) {
     '1' {
         Write-Host "`nScarico VIDEO + AUDIO (massima qualità)..." -ForegroundColor Cyan
-        yt-dlp -f best "$videoUrl"
+        yt-dlp -f best $videoUrl
+        break
     }
     '2' {
         Write-Host "`nScarico SOLO AUDIO (estrazione migliore)..." -ForegroundColor Cyan
-        yt-dlp -x --audio-format mp3 "$videoUrl"
+        yt-dlp -x --audio-format mp3 $videoUrl
+        break
     }
     default {
         Write-Warning "Opzione non valida; esco."
@@ -88,5 +89,6 @@ switch ($choice) {
     }
 }
 
+# 7) Pausa finale
 Write-Host "`nDownload completato." -ForegroundColor Green
 Read-Host -Prompt "Premi Invio per chiudere"
